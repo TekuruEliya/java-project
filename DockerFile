@@ -1,0 +1,6 @@
+# Taking latest version of Tomcat
+FROM Tomcat : latest
+# RUN the 
+  Cp-R 
+# Copy the current path of tomcat
+/usr/local/tomcat
