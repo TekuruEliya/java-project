@@ -1,6 +1,7 @@
 # Taking latest version of Tomcat
 FROM Tomcat : latest
 # RUN the 
-  Cp-R 
-# Copy the current path of tomcat
-/usr/local/tomcat
+ cp -R /usr/local/tomcat/webapps.dist/* /usr/local/tomcat/webapps 
+# Copy the
+ current path of tomcat
+COPY ./*.war /usr/local/tomcat/webapps
