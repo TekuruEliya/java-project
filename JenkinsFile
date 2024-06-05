@@ -1,0 +1,48 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = 'my-tomcat'
+        CONTAINER_NAME = 'my-tomcat-container'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    docker.build("${my-tomcat}")
+                }
+            }
+        }
+
+        stage('Run Docker Container') {
+            steps {
+                script {
+                    def tomcatContainer = docker.run("${my-tomcat}", "-d -p 8080:8080 --name ${my-tomcat-container}")
+                    echo "Tomcat container started with ID: ${tomcatContainer.id}"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                try {
+                    docker.image("${my-tomcatE}").inside {
+                        sh 'docker stop ${my-tomcat-container}'
+                        sh 'docker rm ${my-tomcat-container}'
+                    }
+                } catch (Exception e) {
+                    echo "Failed to stop/remove container: ${e}"
+                }
+            }
+        }
+    }
+}
