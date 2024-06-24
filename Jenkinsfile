@@ -1,74 +1,63 @@
 pipeline {
     agent any
+    
     tools {
-        jdk 'Java17'
-        maven 'Maven3'
+        jdk 'jdk17'
+        maven 'maven3'
     }
     environment {
-	    APP_NAME = "register-app-pipeline"
-        RELEASE = "1.0.0"
-        DOCKER_USER = "7842844601"
-        DOCKER_PASS = 'dockerhub'
-        IMAGE_NAME = "${DOCKER_USER}" + "/" + "${APP_NAME}"
-        IMAGE_TAG = "${RELEASE}-${BUILD_NUMBER}"
+        DOCKERHUB_USERNAME = "${env.DOCKERHUB_USERNAME}"
+        DOCKERHUB_PASSWORD = "${env.DOCKERHUB_PASSWORD}"
+        IMAGE_NAME = "${env.IMAGE_NAME}"
+        APP_NAME = "${env.APP_NAME}"
+        RELEASE_VERSION = "{env.RELEASE_VERSION}"
     }
-    stages{
-        stage("Cleanup Workspace"){
-                steps {
-                cleanWs()
-                }
-        }
 
-        stage("Checkout from SCM"){
-                steps {
-                    git branch: 'main', credentialsId: 'github', url: 'https://github.com/KPhaniPrasad/register-app.git'
-                }
-        }
+    triggers {
+        githubPush()
+    }
 
-        stage("Build Application"){
+    stages {
+        stage('Clean Workspace') {
             steps {
-                sh "mvn clean package"
+                cleanWs()
             }
-
-       }
-
-       stage("Test Application"){
-           steps {
-                 sh "mvn test"
-           }
-       }
-
-        stage("Build & Push Docker Image") {
+        }
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/TekuruEliya/java-project.git'   }
+        }
+        stage('Test') {
+            steps {
+                sh "mvn clean test package"
+            }
+        }
+        stage('Build Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('',DOCKER_PASS) {
-                        docker_image = docker.build "${IMAGE_NAME}"
-                    }
-
-                    docker.withRegistry('',DOCKER_PASS) {
-                        docker_image.push("${IMAGE_TAG}")
-                        docker_image.push('latest')
-                    }
-            }
+                    // Build Docker image
+                    sh 'docker build -t $IMAGE_NAME:latest .'
                 }
-
-       }
-
-       stage("Trivy Scan") {
-           steps {
-               script {
-	            sh ('docker run -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image 7842844601/register-app-pipeline:latest --no-progress --scanners vuln  --exit-code 0 --severity HIGH,CRITICAL --format table')
-               }
-           }
-       }
-
-       stage ('Cleanup Artifacts') {
-           steps {
-               script {
-                    sh "docker rmi ${IMAGE_NAME}:${IMAGE_TAG}"
-                    sh "docker rmi ${IMAGE_NAME}:latest"
-               }
-          }
-       }
+            }
+        }
+        
+        stage('Docker Image Scan using Trivy') {
+            steps {
+                sh "trivy image --format table -o trivy-image-report.html $IMAGE_NAME"
+            }
+        }
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    // Log in to Docker Hub
+                    sh """
+                        echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
+                    """
+                    
+                    // Push Docker image to Docker Hub
+                    sh 'docker push "${IMAGE_NAME}"'
+                }
+            }
+        }
     }
-}  
+}
